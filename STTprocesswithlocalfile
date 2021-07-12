@@ -1,0 +1,65 @@
+package stt.system.sttpath;
+import stt.system.sttresult.sim.simprocess;
+import com.google.cloud.speech.v1.RecognitionAudio;
+import com.google.cloud.speech.v1.RecognitionConfig;
+import com.google.cloud.speech.v1.RecognizeRequest;
+import com.google.cloud.speech.v1.RecognizeResponse;
+import com.google.cloud.speech.v1.SpeechClient;
+import com.google.cloud.speech.v1.SpeechRecognitionAlternative;
+import com.google.cloud.speech.v1.SpeechRecognitionResult;
+import com.google.protobuf.ByteString;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+
+
+public class stttransfer{
+    public static void sampleRecognize() {
+        String localFilePath = "C://recordFile/2.wav";  //주소 경로 지정
+        sampleRecognize(localFilePath); //sampleRecognize메소드에 경로 보내기
+    }
+
+    public static void sampleRecognize(String localFilePath) {
+        try (SpeechClient speechClient = SpeechClient.create()) {
+
+            String languageCode = "ko-KR";
+            int sampleRateHertz = 48000;
+            RecognitionConfig.AudioEncoding encoding = RecognitionConfig.AudioEncoding.LINEAR16;
+            RecognitionConfig config =
+                    RecognitionConfig.newBuilder()
+                            .setLanguageCode(languageCode)
+                            .setSampleRateHertz(sampleRateHertz)
+                            .setAudioChannelCount(2) //wav file channel 2로 해야함
+                            .setEncoding(encoding)
+                            .build();
+            Path path = Paths.get(localFilePath);
+            byte[] data = Files.readAllBytes(path);
+            ByteString content = ByteString.copyFrom(data);
+            RecognitionAudio audio = RecognitionAudio.newBuilder().setContent(content).build();
+            RecognizeRequest request =
+                    RecognizeRequest.newBuilder().setConfig(config).setAudio(audio).build();
+            RecognizeResponse response = speechClient.recognize(request);
+            for (SpeechRecognitionResult result : response.getResultsList()) {
+                SpeechRecognitionAlternative alternative = result.getAlternativesList().get(0);
+                System.out.printf("Transcript: %s\n", alternative.getTranscript());
+                simprocess.similarity(alternative);
+            }
+        } catch (Exception exception) {
+            System.err.println("Failed to create the client due to: " + exception);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        Options options = new Options();
+        options.addOption(
+                Option.builder("").required(false).hasArg(true).longOpt("local_file_path").build());
+
+        CommandLine cl = (new DefaultParser()).parse(options, args);
+        String localFilePath = cl.getOptionValue("local_file_path", "C://recordFile/2.wav");
+        sampleRecognize(localFilePath);
+    }
+}
